@@ -2,7 +2,7 @@
 
 **AI Infrastructure Engineering Series · Plate 01**
 
-> If you came from carrier or ISP networking — MPLS, BGP, IPoMPLS, 5G transport —
+> If you came from carrier or ISP networking, MPLS, BGP, IPoMPLS, 5G transport —
 > this repo is written for you. The concepts aren't new. The vocabulary is.
 
 ---
@@ -201,9 +201,9 @@ reference/
 
 ## Related plates
 
-- Plate 02 — NVLink & NVSwitch
-- Plate 03 — PFC / ECN / DCQCN
-- Plate 06 — RDMA Packet Path
+- Plate 02 — NVLink & NVSwitch (coming soon)
+- Plate 03 — PFC / ECN / DCQCN  (coming soon)
+- Plate 06 — RDMA Packet Path  (coming soon)
 
 ---
 
