@@ -1,0 +1,58 @@
+# NVLink Adjacency Map — DGX H100 SXM5
+# Plate 01 · DGX Node Wiring
+#
+# Each GPU connects to all 4 NVSwitches.
+# Each NVSwitch connects to all 8 GPUs.
+# Result: full all-to-all mesh — any GPU can reach any GPU
+# at full 900 GB/s bidirectional without going through another GPU.
+#
+# NVLink 4.0: 18 links per GPU × 50 GB/s per link = 900 GB/s bidir
+#
+# GPU → NVSwitch connections (each GPU has 18 total NVLink connections,
+# distributed across 4 NVSwitches — approximately 4-5 links per switch):
+#
+#         NVSw0   NVSw1   NVSw2   NVSw3   TOTAL LINKS
+# GPU 0:    5       4       5       4         18
+# GPU 1:    4       5       4       5         18
+# GPU 2:    5       4       5       4         18
+# GPU 3:    4       5       4       5         18
+# GPU 4:    5       4       5       4         18
+# GPU 5:    4       5       4       5         18
+# GPU 6:    5       4       5       4         18
+# GPU 7:    4       5       4       5         18
+#         ─────────────────────────────────────────
+# TOTAL:   36      36      36      36        144 links total in node
+#
+# VERIFY NVLink STATUS:
+#   nvidia-smi nvlink -s -i <gpu_id>     # Link status per GPU
+#   nvidia-smi nvlink -e -i <gpu_id>     # Error counters per GPU
+#   nvidia-smi nvlink -c -i <gpu_id>     # Capability info
+#
+# HEALTHY nvlink -s output (GPU 0 example):
+#   GPU 00000000:0F:00.0
+#       Link 0: <Speed> 26.5625 Gbps
+#       Link 1: <Speed> 26.5625 Gbps
+#       ...
+#       Link 17: <Speed> 26.5625 Gbps
+#   (All 18 links active at 26.5625 Gbps = NVLink 4.0 speed)
+#
+# DEGRADED output (what triggers an incident):
+#   Link 3: <Inactive>
+#   Link 4: <Inactive>
+#   (Any inactive link reduces available bandwidth and may cause
+#    nvidia-smi topo -m to show PHB instead of NV18 for some GPU pairs)
+#
+# BANDWIDTH VALIDATION:
+#   Run cuda-samples/bandwidthTest or dcgm-diag for full NVLink BW test.
+#   Expected peer-to-peer bandwidth: ~300-400 GB/s unidirectional
+#   (Lower than theoretical 450 GB/s due to protocol overhead)
+#
+# NOTE ON NVSwitch 3.0:
+#   The 4 NVSwitches in a DGX H100 are not accessible as discrete devices
+#   to the OS. They appear as connectivity in nvidia-smi topo output.
+#   They are managed through NVLink fabric manager (nv-fabricmanager).
+#   If fabric manager is not running, GPUs cannot communicate via NVLink.
+#
+# CHECK FABRIC MANAGER:
+#   systemctl status nvidia-fabricmanager
+#   journalctl -u nvidia-fabricmanager -f    # Follow logs

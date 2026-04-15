@@ -1,0 +1,66 @@
+# nvidia-smi topo -m — Annotated Healthy Output
+# DGX H100 SXM5 · 8x GPU · NVSwitch 3.0
+# Plate 01 · DGX Node Wiring
+#
+# HOW TO READ THIS:
+#   NV# = NVLink hops between GPUs (lower = faster, NV1 = direct peer)
+#   PHB = PCIe Host Bridge — same root complex, no CPU involvement
+#   NODE = different NUMA node, crosses QPI/UPI
+#   SYS = crosses CPU socket
+#
+# On a healthy DGX H100, ALL GPU-to-GPU paths should be NV18
+# (18 NVLink connections per GPU). Any PHB or SYS path between
+# GPUs indicates NVLink is NOT being used — investigate immediately.
+#
+# Command: nvidia-smi topo -m
+# Expected output on healthy DGX H100:
+
+        GPU0    GPU1    GPU2    GPU3    GPU4    GPU5    GPU6    GPU7    mlx5_0  mlx5_1  mlx5_2  mlx5_3  mlx5_4  mlx5_5  mlx5_6  mlx5_7  CPU Affinity    NUMA Affinity   GPU NUMA ID
+GPU0     X      NV18    NV18    NV18    NV18    NV18    NV18    NV18    PXB     SYS     SYS     SYS     SYS     SYS     SYS     SYS     0-51,104-155    0               N/A
+GPU1    NV18     X      NV18    NV18    NV18    NV18    NV18    NV18    SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     0-51,104-155    0               N/A
+GPU2    NV18    NV18     X      NV18    NV18    NV18    NV18    NV18    SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     0-51,104-155    0               N/A
+GPU3    NV18    NV18    NV18     X      NV18    NV18    NV18    NV18    SYS     SYS     SYS     PXB     SYS     SYS     SYS     SYS     0-51,104-155    0               N/A
+GPU4    NV18    NV18    NV18    NV18     X      NV18    NV18    NV18    SYS     SYS     SYS     SYS     PXB     SYS     SYS     SYS     52-103,156-207  1               N/A
+GPU5    NV18    NV18    NV18    NV18    NV18     X      NV18    NV18    SYS     SYS     SYS     SYS     SYS     PXB     SYS     SYS     52-103,156-207  1               N/A
+GPU6    NV18    NV18    NV18    NV18    NV18    NV18     X      NV18    SYS     SYS     SYS     SYS     SYS     SYS     PXB     SYS     52-103,156-207  1               N/A
+GPU7    NV18    NV18    NV18    NV18    NV18    NV18    NV18     X      SYS     SYS     SYS     SYS     SYS     SYS     SYS     PXB     52-103,156-207  1               N/A
+mlx5_0  PXB     SYS     SYS     SYS     SYS     SYS     SYS     SYS      X      PIX     SYS     SYS     SYS     SYS     SYS     SYS
+mlx5_1  SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     PIX      X      SYS     SYS     SYS     SYS     SYS     SYS
+mlx5_2  SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     SYS      X      PIX     SYS     SYS     SYS     SYS
+mlx5_3  SYS     SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     PIX      X      SYS     SYS     SYS     SYS
+mlx5_4  SYS     SYS     SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     SYS      X      PIX     SYS     SYS
+mlx5_5  SYS     SYS     SYS     SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     PIX      X      SYS     SYS
+mlx5_6  SYS     SYS     SYS     SYS     SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     SYS      X      PIX
+mlx5_7  SYS     SYS     SYS     SYS     SYS     SYS     SYS     PXB     SYS     SYS     SYS     SYS     SYS     SYS     PIX      X
+
+#
+# KEY ANNOTATIONS:
+#
+# ✓ GPU0↔GPU1: NV18  — GOOD. Direct NVLink. Full 900 GB/s bidirectional.
+# ✓ GPU0↔GPU7: NV18  — GOOD. Even cross-NUMA GPU pairs use NVLink, not PCIe.
+# ✓ GPU0↔mlx5_0: PXB — GOOD. GPU0 and its NIC are on the same PCIe root complex.
+#                        This is the GPUDirect RDMA path. Low latency.
+# ✗ If GPU0↔GPU1 shows PHB or SYS instead of NV18:
+#     → NVSwitch link down or NVLink disabled
+#     → Check: nvidia-smi nvlink -s -i 0
+#     → Check: dmesg | grep -i nvlink
+#
+# ✓ mlx5_0↔mlx5_1: PIX — GOOD. Two NICs sharing a PCIe switch. Expected.
+# ✗ If any GPU↔GPU shows PIX or PHB:
+#     → Run: nvidia-smi nvlink -e -i <gpu_id>  (error counters)
+#     → If errors > 0: reseat GPU or contact NVIDIA support
+#
+# NUMA NOTE:
+#   GPUs 0-3 + NICs 0-3: NUMA node 0 (CPU socket 0)
+#   GPUs 4-7 + NICs 4-7: NUMA node 1 (CPU socket 1)
+#   Cross-NUMA GPU traffic still uses NVLink (fast).
+#   Cross-NUMA CPU↔GPU traffic crosses QPI (slower) — minimize this in code.
+#
+# DEGRADED EXAMPLE (what you don't want to see):
+#
+# GPU0    GPU1
+# NV18     X     ← This is normal
+# PHB      X     ← This means NVLink is down between GPU0 and GPU1
+#                   One or more NVLink connections have failed.
+#                   nvidia-smi shows this node as degraded.
+#                   Do NOT run training jobs on this node.

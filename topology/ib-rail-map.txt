@@ -1,0 +1,44 @@
+# IB Rail Map — DGX H100
+# Plate 01 · DGX Node Wiring
+#
+# Rail-optimized topology: each GPU has a dedicated NIC on a dedicated
+# leaf switch. This prevents one GPU's AllReduce traffic from congesting
+# another GPU's uplink during collective operations.
+#
+# FORMAT: GPU_ID | NIC | mlx5 device | IB port | Rail | Leaf Switch
+# ─────────────────────────────────────────────────────────────────────
+GPU 0   │ NIC 0  │ mlx5_0  │ HCA:port1  │ Rail 0  │ Leaf-SW-0
+GPU 1   │ NIC 1  │ mlx5_1  │ HCA:port1  │ Rail 1  │ Leaf-SW-1
+GPU 2   │ NIC 2  │ mlx5_2  │ HCA:port1  │ Rail 2  │ Leaf-SW-2
+GPU 3   │ NIC 3  │ mlx5_3  │ HCA:port1  │ Rail 3  │ Leaf-SW-3
+GPU 4   │ NIC 4  │ mlx5_4  │ HCA:port1  │ Rail 4  │ Leaf-SW-4
+GPU 5   │ NIC 5  │ mlx5_5  │ HCA:port1  │ Rail 5  │ Leaf-SW-5
+GPU 6   │ NIC 6  │ mlx5_6  │ HCA:port1  │ Rail 6  │ Leaf-SW-6
+GPU 7   │ NIC 7  │ mlx5_7  │ HCA:port1  │ Rail 7  │ Leaf-SW-7
+─────────────────────────────────────────────────────────────────────
+Storage │ NIC 8  │ mlx5_8  │ HCA:port1  │ Storage │ Storage-SW
+Storage │ NIC 9  │ mlx5_9  │ HCA:port1  │ Storage │ Storage-SW
+─────────────────────────────────────────────────────────────────────
+
+# VERIFY THIS MAPPING ON YOUR NODE:
+# The mlx5 device numbering may differ depending on system firmware
+# and driver version. Always verify with:
+#
+#   ibdev2netdev       # Maps mlx5 devices to network interfaces
+#   ibstat             # Shows port state and GUIDs for each HCA
+#   nvidia-smi topo -m # Confirms GPU-to-NIC affinity
+#
+# CROSS-RAIL TRAFFIC:
+# In a fat-tree topology, cross-rail communication (GPU 0 on Node A
+# talking to GPU 1 on Node B) goes:
+#   GPU0 → NIC0 (mlx5_0) → Rail-0-Leaf → Spine → Rail-1-Leaf → NIC1 → GPU1
+#
+# This is intentional. Each GPU pair has a dedicated path through the
+# fabric. No head-of-line blocking between GPUs on the same node.
+#
+# COMMON MISCONFIGURATION:
+# If all 8 GPUs on a node share one or two uplinks (non-rail topology),
+# AllReduce bandwidth will be severely limited. You'll see:
+#   - NCCL bandwidth ~1/8 of expected
+#   - Spine switch utilization high on a few ports, low on others
+#   - Asymmetric training job completion times
